@@ -1,0 +1,30 @@
+stages:
+  - sonar
+  - build
+  - push
+
+sonarqube-check:
+  image:
+    name: sonarsource/sonar-scanner-cli:11
+    entrypoint: [""]
+  stage: sonar
+  script:
+    - |
+      sonar-scanner \
+        -Dsonar.projectKey=project-sesi22 \
+        -Dsonar.sources=. \
+        -Dsonar.host.url=$SONAR_HOST_URL \
+        -Dsonar.login=$SONAR_TOKEN
+
+build_image:
+  stage: build
+  image: docker:latest
+  services:
+    - docker:dind
+  before_script:
+    - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
+  script:
+    - docker build -t $DOCKER_USERNAME/php-sederhana:$CI_COMMIT_SHORT_SHA .
+    - docker push $DOCKER_USERNAME/php-sederhana:$CI_COMMIT_SHORT_SHA
+    - docker tag $DOCKER_USERNAME/php-sederhana:$CI_COMMIT_SHORT_SHA $DOCKER_USERNAME/php-sederhana:latest
+    - docker push $DOCKER_USERNAME/php-sederhana:latest

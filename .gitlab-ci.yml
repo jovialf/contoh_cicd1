@@ -1,0 +1,64 @@
+stages:
+  - test-phpstan
+  - test-phpunit
+  - sonar
+  - build
+
+phpstan:
+  stage: test-phpstan
+  image: php:8.2
+  before_script:
+    - apt-get update && apt-get install -y unzip git curl
+    - curl -LsS https://github.com/phpstan/phpstan/releases/latest/download/phpstan.phar -o phpstan.phar
+    - chmod +x phpstan.phar
+  script:
+    - ./phpstan.phar analyse --level=3 --memory-limit=512M .
+
+phpunit:
+  stage: test-phpunit
+  image: php:8.2-cli
+  before_script:
+    - apt-get update && apt-get install -y git unzip curl libxml2-dev libonig-dev
+    - pecl install xdebug
+    - docker-php-ext-enable xdebug
+    - docker-php-ext-install mbstring xml
+    - curl -sS https://getcomposer.org/installer | php
+    - php composer.phar install
+  script:
+    - export XDEBUG_MODE=coverage
+    - ./vendor/bin/phpunit tests --coverage-clover=coverage.xml
+  artifacts:
+    paths:
+      - coverage.xml
+    expire_in: 1h
+
+sonarqube-check:
+  image:
+    name: sonarsource/sonar-scanner-cli:11
+    entrypoint: [""]
+  stage: sonar
+  script:
+    - |
+      sonar-scanner \
+        -Dsonar.projectKey=project-sesi22 \
+        -Dsonar.sources=. \
+        -Dsonar.php.coverage.reportPaths=coverage.xml \
+        -Dsonar.host.url=$SONAR_HOST_URL \
+        -Dsonar.login=$SONAR_TOKEN
+
+build_image:
+  stage: build
+  image: docker:latest
+  services:
+    - name: docker:dind
+      alias: docker
+  variables:
+    DOCKER_HOST: tcp://docker:2375/
+    DOCKER_TLS_CERTDIR: ""
+  before_script:
+    - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
+  script:
+    - docker build -t $DOCKER_USERNAME/php-sederhana:$CI_COMMIT_SHORT_SHA .
+    - docker push $DOCKER_USERNAME/php-sederhana:$CI_COMMIT_SHORT_SHA
+    - docker tag $DOCKER_USERNAME/php-sederhana:$CI_COMMIT_SHORT_SHA $DOCKER_USERNAME/php-sederhana:latest
+    - docker push $DOCKER_USERNAME/php-sederhana:latest
