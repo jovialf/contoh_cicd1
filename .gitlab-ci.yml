@@ -40,7 +40,7 @@ sonarqube-check:
   script:
     - |
       sonar-scanner \
-        -Dsonar.projectKey=project-sesi22 \
+        -Dsonar.projectKey=$NAMA_PROJECT \
         -Dsonar.sources=. \
         -Dsonar.php.coverage.reportPaths=coverage.xml \
         -Dsonar.host.url=$SONAR_HOST_URL \
